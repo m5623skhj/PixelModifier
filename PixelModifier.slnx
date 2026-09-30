@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/PixelModifier.Core/PixelModifier.Core.csproj" />
+  <Project Path="src/PixelModifier.App/PixelModifier.App.csproj" />
+  <Project Path="checks/PixelModifier.Checks.csproj" />
+</Solution>

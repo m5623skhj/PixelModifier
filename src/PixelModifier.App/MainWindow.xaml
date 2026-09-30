@@ -1,0 +1,136 @@
+<Window x:Class="PixelModifier.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:PixelModifier.App"
+        Title="PixelModifier — 동작 후보 제작" Width="1480" Height="920" MinWidth="1200" MinHeight="760"
+        Background="#101725" Foreground="#E7EBF3" FontFamily="Segoe UI, Malgun Gothic" FontSize="13"
+        Closing="Window_Closing">
+  <Grid Margin="20">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <DockPanel Margin="0,0,0,15">
+      <StackPanel DockPanel.Dock="Left">
+        <TextBlock Text="PixelModifier" FontSize="27" FontWeight="SemiBold"/>
+        <TextBlock Text="기준 자세를 정하고, 여러 움직임 중에서 골라보세요." Foreground="{StaticResource MutedBrush}" Margin="0,4,0,0"/>
+      </StackPanel>
+      <StackPanel x:Name="ProjectToolbar" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <Button Content="프로젝트 열기" Click="OpenProject_Click"/>
+        <Button Content="프로젝트 저장" Click="SaveProject_Click"/>
+        <Button Content="PNG 추가" Background="#237F79" Click="AddPng_Click"/>
+      </StackPanel>
+    </DockPanel>
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="262"/><ColumnDefinition Width="12"/><ColumnDefinition Width="*"/><ColumnDefinition Width="12"/><ColumnDefinition Width="430"/></Grid.ColumnDefinitions>
+      <Border Grid.Column="0" Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="14">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+          <StackPanel x:Name="SettingsPanel" Width="212">
+            <TextBlock Text="1   기준 이미지" FontSize="16" FontWeight="SemiBold"/>
+            <TextBlock Text="같은 캐릭터 · 같은 시점 · 투명 PNG" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,5,0,9"/>
+            <ListBox x:Name="SourcesList" Height="140" ItemsSource="{Binding Sources}" SelectionChanged="Sources_SelectionChanged">
+              <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="3,5"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding PhaseLabel}" FontSize="11" Foreground="#9CB5CD"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+            </ListBox>
+            <StackPanel Orientation="Horizontal"><Button Content="↑" Click="SourceUp_Click" Padding="13,5"/><Button Content="↓" Click="SourceDown_Click" Padding="13,5"/><Button Content="제거" Click="RemoveSource_Click" Padding="13,5"/></StackPanel>
+            <TextBlock Text="선택한 자세의 주기 위치 (%)" Margin="0,7,0,0"/>
+            <DockPanel><TextBox x:Name="PhaseBox" Text="0" Width="65" DockPanel.Dock="Right" LostFocus="Phase_LostFocus"/><Slider x:Name="PhaseSlider" Minimum="0" Maximum="99.9" TickFrequency="1" ValueChanged="Phase_ValueChanged" Margin="0,7,8,5"/></DockPanel>
+            <TextBlock Text="여러 장은 주기 안에서 순서대로 연결됩니다." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="11"/>
+            <Separator Margin="0,14"/>
+            <TextBlock Text="2   생성 조건" FontSize="16" FontWeight="SemiBold"/>
+            <TextBlock Text="동작" Margin="0,10,0,0"/>
+            <ComboBox x:Name="MotionBox" SelectedIndex="0" SelectionChanged="Motion_Changed"><ComboBoxItem Content="걷기"/><ComboBoxItem Content="달리기"/></ComboBox>
+            <TextBlock Text="바라보는 방향"/>
+            <ComboBox x:Name="FacingBox" SelectedIndex="0"><ComboBoxItem Content="오른쪽"/><ComboBoxItem Content="왼쪽"/><ComboBoxItem Content="정면"/></ComboBox>
+            <Grid>
+              <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions>
+              <StackPanel><TextBlock Text="출력 프레임 수"/><TextBox x:Name="FrameCountBox" Text="8"/></StackPanel>
+              <StackPanel Grid.Column="2"><TextBlock Text="후보 수"/><TextBox x:Name="CandidateCountBox" Text="12"/></StackPanel>
+            </Grid>
+            <TextBlock Text="움직임 강도"/>
+            <Slider x:Name="IntensitySlider" Minimum="0.1" Maximum="2" Value="1" TickFrequency=".1" Margin="0,7,0,12"/>
+            <Grid>
+              <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions>
+              <StackPanel><TextBlock Text="재생 속도 (FPS)"/><TextBox x:Name="FpsBox" Text="10"/></StackPanel>
+              <StackPanel Grid.Column="2"><TextBlock Text="난수 기준값"/><TextBox x:Name="SeedBox" Text="1000"/></StackPanel>
+            </Grid>
+            <Button x:Name="GenerateButton" Content="움직임 후보 생성" Background="#237F79" Click="Generate_Click" Margin="0,6,0,0" Padding="14,12"/>
+            <TextBlock Text="같은 이미지·설정·기준값은 같은 결과를 만듭니다." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,8,0,0"/>
+            <Separator Margin="0,14"/>
+            <TextBlock Text="3   출력 설정" FontSize="16" FontWeight="SemiBold"/>
+            <Grid Margin="0,10,0,0">
+              <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions>
+              <StackPanel><TextBlock Text="셀 크기 (px)"/><TextBox x:Name="CellSizeBox" Text="256"/></StackPanel>
+              <StackPanel Grid.Column="2"><TextBlock Text="시트 열 수"/><TextBox x:Name="ColumnsBox" Text="4"/></StackPanel>
+            </Grid>
+            <Button x:Name="ExportButton" Content="선택한 후보 PNG 저장" Click="Export_Click" IsEnabled="False" Margin="0,4,0,0"/>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+      <Border Grid.Column="2" Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="12">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+          <TextBlock x:Name="CenterTitle" Text="캐릭터 설정" FontSize="16" FontWeight="SemiBold" Margin="3,0,0,10"/>
+          <TabControl x:Name="EditorTabs" Grid.Row="1" Background="#182132" Foreground="#E7EBF3" BorderBrush="#334259">
+            <TabItem Header="관절·부위">
+              <Grid Margin="6">
+                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <StackPanel x:Name="EditorTools">
+                  <DockPanel>
+                    <ComboBox x:Name="EditModeBox" Width="115" SelectedIndex="0" SelectionChanged="EditMode_Changed"><ComboBoxItem Content="관절 이동"/><ComboBoxItem Content="부위 칠하기"/></ComboBox>
+                    <CheckBox x:Name="RegionCheck" Content="부위 표시" Foreground="#E7EBF3" Margin="12,8,0,0" Checked="RegionDisplay_Changed" Unchecked="RegionDisplay_Changed"/>
+                    <Button Content="부위 다시 추정" Click="ResetRegions_Click" HorizontalAlignment="Right" Padding="8,5"/>
+                  </DockPanel>
+                  <DockPanel x:Name="BrushTools" Visibility="Collapsed">
+                    <ComboBox x:Name="PartBox" Width="125" SelectedIndex="0" SelectionChanged="Part_Changed">
+                      <ComboBoxItem Content="몸통"/><ComboBoxItem Content="머리"/><ComboBoxItem Content="팔 A"/><ComboBoxItem Content="팔 B"/><ComboBoxItem Content="다리 A"/><ComboBoxItem Content="다리 B"/><ComboBoxItem Content="옷자락"/>
+                    </ComboBox>
+                    <TextBlock Text="붓 크기" Margin="12,8,5,0"/><Slider x:Name="BrushSlider" Minimum=".01" Maximum=".12" Value=".04" ValueChanged="Brush_Changed" Margin="3,5,0,0"/>
+                  </DockPanel>
+                </StackPanel>
+                <local:RigEditor x:Name="RigCanvas" Grid.Row="1" MinHeight="280" Margin="0,5,0,8"/>
+                <TextBlock x:Name="EditorHint" Grid.Row="2" Text="흰 점을 실제 관절 위치로 끌어주세요. A는 앞쪽, B는 뒤쪽 부위입니다." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="3,2"/>
+              </Grid>
+            </TabItem>
+            <TabItem Header="선택한 후보">
+              <Grid Margin="6">
+                <Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                <Border Background="{StaticResource Checker}" Margin="0,5,0,10"><Image x:Name="SelectedPreview" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor" Margin="15"/></Border>
+                <DockPanel Grid.Row="1"><Button x:Name="PlayButton" Content="일시 정지" Click="Play_Click" DockPanel.Dock="Left"/><TextBlock x:Name="FrameLabel" Text="후보를 먼저 생성해 주세요." VerticalAlignment="Center" HorizontalAlignment="Right"/></DockPanel>
+                <Slider x:Name="FrameSlider" Grid.Row="2" Minimum="0" Maximum="7" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="Frame_Changed" Margin="0,8"/>
+              </Grid>
+            </TabItem>
+          </TabControl>
+          <TextBlock Grid.Row="2" Text="가려진 부위의 새 그림은 만들지 않습니다. 큰 움직임은 추가 기준 자세로 보완할 수 있습니다." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="3,10,0,0"/>
+        </Grid>
+      </Border>
+      <Border Grid.Column="4" Background="{StaticResource SurfaceBrush}" CornerRadius="8" Padding="12">
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+          <DockPanel><TextBlock Text="움직임 후보" FontSize="16" FontWeight="SemiBold"/><TextBlock x:Name="CandidateSummary" Text="0개" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right"/></DockPanel>
+          <TextBlock Grid.Row="1" Text="동작 안정성이 높은 순서입니다. 클릭해서 비교하세요." Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,7,0,10"/>
+          <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Candidates}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Border Width="182" Margin="0,0,8,10" Padding="6" BorderThickness="2" CornerRadius="6" MouseLeftButtonUp="Candidate_Click" Cursor="Hand">
+                    <Border.Style><Style TargetType="Border"><Setter Property="BorderBrush" Value="#34455F"/><Setter Property="Background" Value="#101A2A"/><Style.Triggers><DataTrigger Binding="{Binding IsSelected}" Value="True"><Setter Property="BorderBrush" Value="#66D6C3"/><Setter Property="Background" Value="#173832"/></DataTrigger></Style.Triggers></Style></Border.Style>
+                    <StackPanel>
+                      <Border Background="{StaticResource Checker}" Height="156"><Image Source="{Binding Preview}" Stretch="Uniform" RenderOptions.BitmapScalingMode="NearestNeighbor"/></Border>
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="3,7,0,3"/>
+                      <TextBlock Text="{Binding Details}" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="3,0,0,3"/>
+                      <TextBlock Text="{Binding QualityLabel}" FontSize="10" Foreground="#9CB5CD" Margin="3,0,0,3"
+                                 ToolTip="접지, 관절 길이, 프레임 연결과 변형 제한을 평가한 참고 점수입니다. 실제 움직임도 확인해 주세요."/>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Grid>
+    <DockPanel Grid.Row="2" Margin="0,12,0,0">
+      <Button x:Name="CancelButton" Content="취소" Visibility="Collapsed" Click="Cancel_Click" DockPanel.Dock="Right" Padding="12,5"/>
+      <ProgressBar x:Name="Progress" Width="180" Height="5" DockPanel.Dock="Right" Minimum="0" Maximum="1" Value="0" Margin="15,0,0,0"/>
+      <TextBlock x:Name="Status" Text="PNG를 추가한 뒤 관절 위치를 확인해 주세요." Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+    </DockPanel>
+  </Grid>
+</Window>
