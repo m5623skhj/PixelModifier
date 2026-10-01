@@ -6,7 +6,7 @@ public sealed record MotionQuality(float Score, float DeformationRetention, floa
     float MotionLoss, float AbruptMotion, float LoopJump, float BoneError, float KneeError);
 
 public sealed record MotionCycle(IReadOnlyList<FramePlan> Frames, IReadOnlyList<LayerMap> SourceLayers,
-    IReadOnlyList<float> LayerScales, MotionQuality Quality)
+    IReadOnlyList<float> LayerScales, MotionQuality Quality, int WorkingSize)
 {
     /// <summary>Plans an entire loop with per-layer limits; one limb cannot reduce the other parts' movement.</summary>
     public static MotionCycle Create(IReadOnlyList<RenderSource> sources, MotionVariant variant,
@@ -28,7 +28,7 @@ public sealed record MotionCycle(IReadOnlyList<FramePlan> Frames, IReadOnlyList<
         }
         float retention = scales.Average();
         var quality = Evaluate(sources, variant, settings, retention, cancellation);
-        return new(Array.AsReadOnly(frames), Array.AsReadOnly(layers), Array.AsReadOnly(scales), quality);
+        return new(Array.AsReadOnly(frames), Array.AsReadOnly(layers), Array.AsReadOnly(scales), quality, settings.WorkingSize);
     }
 
     /// <summary>Ranks geometric stability, including the loop seam. This is a heuristic, not a visual quality model.</summary>

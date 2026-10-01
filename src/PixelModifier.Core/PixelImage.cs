@@ -16,6 +16,27 @@ public sealed class PixelImage
         Width = width; Height = height; pixels = rgba;
     }
     public byte[] CopyPixels() => (byte[])pixels.Clone();
+    /// <summary>Fits the complete canvas without moving its anchor. Enlargements use whole pixel blocks.</summary>
+    public PixelImage FitCell(int width, int height)
+    {
+        if (width < 1 || height < 1) throw new ArgumentOutOfRangeException(nameof(width));
+        if (width == Width && height == Height) return this;
+        float scale = Math.Min((float)width / Width, (float)height / Height);
+        if (scale >= 1) scale = MathF.Floor(scale);
+        int fittedWidth = Math.Max(1, (int)(Width * scale));
+        int fittedHeight = Math.Max(1, (int)(Height * scale));
+        int offsetX = (width - fittedWidth) / 2, offsetY = (height - fittedHeight) / 2;
+        var output = new byte[checked(width * height * 4)];
+        for (int y = 0; y < fittedHeight; y++)
+            for (int x = 0; x < fittedWidth; x++)
+            {
+                int sx = Math.Min(Width - 1, (int)((x + .5f) * Width / fittedWidth));
+                int sy = Math.Min(Height - 1, (int)((y + .5f) * Height / fittedHeight));
+                pixels.AsSpan((sy * Width + sx) * 4, 4).CopyTo(
+                    output.AsSpan(((y + offsetY) * width + x + offsetX) * 4, 4));
+            }
+        return new(width, height, output);
+    }
     public PixelBounds Bounds()
     {
         int left = Width, top = Height, right = -1, bottom = -1;

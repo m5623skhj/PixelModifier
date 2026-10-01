@@ -80,6 +80,7 @@ public sealed class GenerationSettings
     public int Seed { get; set; } = 1000;
     public float Intensity { get; set; } = 1;
     public float FramesPerSecond { get; set; } = 10;
+    public int WorkingSize { get; set; } = 64;
     public int CellWidth { get; set; } = 256;
     public int CellHeight { get; set; } = 256;
     public int Columns { get; set; } = 4;
@@ -96,6 +97,8 @@ public sealed class GenerationSettings
             throw new InvalidDataException("재생 속도는 1~120 FPS 범위여야 합니다.");
         if (CellWidth < 32 || CellHeight < 32 || CellWidth > 4096 || CellHeight > 4096)
             throw new InvalidDataException("셀 크기는 32~4096 픽셀 범위여야 합니다.");
+        if (WorkingSize < 32 || WorkingSize > 256 || WorkingSize > Math.Min(CellWidth, CellHeight))
+            throw new InvalidDataException("작업 해상도는 32~256px이며 출력 셀보다 클 수 없습니다.");
         if (Columns < 1 || Columns > FrameCount)
             throw new InvalidDataException("열 수는 1~프레임 수 범위여야 합니다.");
         long sheetPixels = (long)(Columns * CellWidth) * (((FrameCount + Columns - 1) / Columns) * CellHeight);
@@ -132,8 +135,13 @@ public sealed class ProjectDocument
     }
     public static ProjectDocument Load(string path)
     {
-        var doc = JsonSerializer.Deserialize<ProjectDocument>(File.ReadAllText(path), JsonOptions)
+        string json = File.ReadAllText(path);
+        var doc = JsonSerializer.Deserialize<ProjectDocument>(json, JsonOptions)
             ?? throw new InvalidDataException("프로젝트 파일을 읽을 수 없습니다.");
+        using var parsed = JsonDocument.Parse(json);
+        if (!parsed.RootElement.TryGetProperty("Settings", out var settings) ||
+            !settings.TryGetProperty("WorkingSize", out _))
+            doc.Settings.WorkingSize = Math.Min(64, Math.Min(doc.Settings.CellWidth, doc.Settings.CellHeight));
         if (doc.Version != 1) throw new InvalidDataException("지원하지 않는 프로젝트 버전입니다.");
         if (doc.Sources.Count > 64) throw new InvalidDataException("기준 이미지는 최대 64장입니다.");
         string root = System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(path))!;

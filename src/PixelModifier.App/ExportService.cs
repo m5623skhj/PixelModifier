@@ -13,6 +13,8 @@ public static class ExportService
         var cycle = MotionCycle.Create(sources, variant, settings, cancellation);
         int rows = (settings.FrameCount + settings.Columns - 1) / settings.Columns;
         int width = settings.Columns * settings.CellWidth, height = rows * settings.CellHeight;
+        int pixelScale = Math.Min(settings.CellWidth, settings.CellHeight) / settings.WorkingSize;
+        int fittedSize = settings.WorkingSize * pixelScale;
         var sheet = new byte[checked(width * height * 4)];
         for (int frame = 0; frame < settings.FrameCount; frame++)
         {
@@ -31,10 +33,11 @@ public static class ExportService
             motion = settings.Motion.ToString().ToLowerInvariant(), loop = true,
             frame_count = settings.FrameCount, columns = settings.Columns, rows,
             cell_width = settings.CellWidth, cell_height = settings.CellHeight,
+            working_size = settings.WorkingSize,
+            pixel_scale = pixelScale,
             frames_per_second = settings.FramesPerSecond, frame_seconds = 1 / settings.FramesPerSecond,
-            anchor_x = .5f,
-            anchor_y = ((settings.CellHeight - Math.Min(settings.CellWidth, settings.CellHeight)) * .5f +
-                Math.Min(settings.CellWidth, settings.CellHeight) * .90f) / settings.CellHeight,
+            anchor_x = ((settings.CellWidth - fittedSize) / 2 + fittedSize * .5f) / settings.CellWidth,
+            anchor_y = ((settings.CellHeight - fittedSize) / 2 + fittedSize * .90f) / settings.CellHeight,
             facing = settings.Facing.ToString(), variant, motion_quality = cycle.Quality
         };
         string pngTemp = path + ".tmp", jsonPath = Path.ChangeExtension(path, ".json"), jsonTemp = jsonPath + ".tmp";

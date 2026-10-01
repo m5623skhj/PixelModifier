@@ -55,7 +55,8 @@ public static class Renderer
         var plan = Timeline.Plan(sources, phase, variant, settings);
         var source = sources[plan.SourceIndex];
         var layers = LayerMap.Create(source, cancellation);
-        return RenderFrame(source, layers, plan, phase, variant, width, height, null, cancellation);
+        return RenderFrame(source, layers, plan, phase, variant,
+            settings.WorkingSize, settings.WorkingSize, null, cancellation).FitCell(width, height);
     }
 
     public static PixelImage Render(IReadOnlyList<RenderSource> sources, MotionCycle cycle, int frame,
@@ -64,7 +65,8 @@ public static class Renderer
         if (frame < 0 || frame >= cycle.Frames.Count) throw new ArgumentOutOfRangeException(nameof(frame));
         var plan = cycle.Frames[frame];
         return RenderFrame(sources[plan.SourceIndex], cycle.SourceLayers[plan.SourceIndex], plan,
-            (float)frame / cycle.Frames.Count, variant, width, height, cycle.LayerScales, cancellation);
+            (float)frame / cycle.Frames.Count, variant, cycle.WorkingSize, cycle.WorkingSize,
+            cycle.LayerScales, cancellation).FitCell(width, height);
     }
 
     internal static float[] LayerLimits(RenderSource source, LayerMap layers, FramePlan plan, float phase,
@@ -113,9 +115,11 @@ public static class Renderer
         var output = new byte[checked(width * height * 4)];
         ReadOnlySpan<SpriteLayer> order =
         [
-            SpriteLayer.ArmBUpper, SpriteLayer.ArmBLower, SpriteLayer.LegBUpper, SpriteLayer.LegBLower,
-            SpriteLayer.Coat, SpriteLayer.Torso, SpriteLayer.LegAUpper, SpriteLayer.LegALower,
-            SpriteLayer.ArmAUpper, SpriteLayer.ArmALower, SpriteLayer.Head
+            SpriteLayer.ArmBUpper, SpriteLayer.ArmBLower, SpriteLayer.ElbowB,
+            SpriteLayer.LegBUpper, SpriteLayer.LegBLower, SpriteLayer.KneeB,
+            SpriteLayer.Coat, SpriteLayer.Torso, SpriteLayer.ShoulderB,
+            SpriteLayer.LegAUpper, SpriteLayer.LegALower, SpriteLayer.KneeA, SpriteLayer.Hip,
+            SpriteLayer.ArmAUpper, SpriteLayer.ArmALower, SpriteLayer.ElbowA, SpriteLayer.ShoulderA, SpriteLayer.Head
         ];
         foreach (var layer in order)
         {
@@ -194,6 +198,24 @@ public static class Renderer
 
     private static Vector2 Transform(Vector2 p, SpriteLayer layer, Rig rest, Rig pose)
     {
+        var cap = layer switch
+        {
+            SpriteLayer.ElbowA => (Joint.ElbowA, Joint.ShoulderA, Joint.HandA),
+            SpriteLayer.ElbowB => (Joint.ElbowB, Joint.ShoulderB, Joint.HandB),
+            SpriteLayer.KneeA => (Joint.KneeA, Joint.Hip, Joint.FootA),
+            SpriteLayer.KneeB => (Joint.KneeB, Joint.Hip, Joint.FootB),
+            SpriteLayer.ShoulderA => (Joint.ShoulderA, Joint.Neck, Joint.ElbowA),
+            SpriteLayer.ShoulderB => (Joint.ShoulderB, Joint.Neck, Joint.ElbowB),
+            SpriteLayer.Hip => (Joint.Hip, Joint.Neck, Joint.Neck),
+            _ => ((Joint)(-1), Joint.Neck, Joint.Neck)
+        };
+        if ((int)cap.Item1 >= 0)
+        {
+            float first = BoneAngle(cap.Item1, cap.Item2);
+            float second = BoneAngle(cap.Item1, cap.Item3);
+            float capAngle = first + MathF.Atan2(MathF.Sin(second - first), MathF.Cos(second - first)) * .5f;
+            return pose[cap.Item1].Vector + Motion.Rotate(p - rest[cap.Item1].Vector, capAngle);
+        }
         var (root, end) = layer switch
         {
             SpriteLayer.Head => (Joint.Neck, Joint.Head),
@@ -213,6 +235,14 @@ public static class Renderer
         float angle = MathF.Atan2(to.Y, to.X) - MathF.Atan2(from.Y, from.X);
         float scale = Math.Clamp(to.Length() / from.Length(), .65f, 1.5f);
         return pose[root].Vector + Motion.Rotate(p - rest[root].Vector, angle) * scale;
+
+        float BoneAngle(Joint start, Joint finish)
+        {
+            var originalDirection = rest[finish].Vector - rest[start].Vector;
+            var posedDirection = pose[finish].Vector - pose[start].Vector;
+            if (originalDirection.LengthSquared() < 1e-10f || posedDirection.LengthSquared() < 1e-10f) return 0;
+            return MathF.Atan2(posedDirection.Y, posedDirection.X) - MathF.Atan2(originalDirection.Y, originalDirection.X);
+        }
     }
 
     private static float Cross(Vector2 a, Vector2 b) => a.X * b.Y - a.Y * b.X;

@@ -29,7 +29,8 @@ public partial class App : Application
         if (args.Length != 3) throw new ArgumentException("--render-example input.png output-folder");
         Directory.CreateDirectory(args[2]);
         var original = Imaging.LoadPng(args[1]);
-        var normalized = original.Normalize(256, 256);
+        int workingSize = new GenerationSettings().WorkingSize;
+        var normalized = original.Normalize(workingSize, workingSize);
         var rig = Rigging.Guess(normalized);
         var regions = Rigging.GuessRegions(rig);
         var sources = new[] { new RenderSource(normalized, rig, regions, 0) };

@@ -45,6 +45,9 @@
             </Grid>
             <TextBlock Text="움직임 강도"/>
             <Slider x:Name="IntensitySlider" Minimum="0.1" Maximum="2" Value="1" TickFrequency=".1" Margin="0,7,0,12"/>
+            <TextBlock Text="작업 해상도 (px)"/>
+            <TextBox x:Name="WorkingSizeBox" Text="64"/>
+            <TextBlock Text="32~256px · 세부가 뭉개지면 높이세요. 저장할 때 정수 배율로 확대합니다." TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,0,0,8"/>
             <Grid>
               <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="10"/><ColumnDefinition/></Grid.ColumnDefinitions>
               <StackPanel><TextBlock Text="재생 속도 (FPS)"/><TextBox x:Name="FpsBox" Text="10"/></StackPanel>
@@ -104,7 +107,7 @@
         <Grid>
           <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <DockPanel><TextBlock Text="움직임 후보" FontSize="16" FontWeight="SemiBold"/><TextBlock x:Name="CandidateSummary" Text="0개" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right"/></DockPanel>
-          <TextBlock Grid.Row="1" Text="동작 안정성이 높은 순서입니다. 클릭해서 비교하세요." Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,7,0,10"/>
+          <TextBlock Grid.Row="1" Text="도트 상태·동작 안정성 순입니다. 클릭해서 비교하세요." Foreground="{StaticResource MutedBrush}" FontSize="11" Margin="0,7,0,10"/>
           <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Candidates}">
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -117,7 +120,7 @@
                       <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Margin="3,7,0,3"/>
                       <TextBlock Text="{Binding Details}" FontSize="10" Foreground="{StaticResource MutedBrush}" Margin="3,0,0,3"/>
                       <TextBlock Text="{Binding QualityLabel}" FontSize="10" Foreground="#9CB5CD" Margin="3,0,0,3"
-                                 ToolTip="접지, 관절 길이, 프레임 연결과 변형 제한을 평가한 참고 점수입니다. 실제 움직임도 확인해 주세요."/>
+                                 ToolTip="{Binding QualityDetails}"/>
                     </StackPanel>
                   </Border>
                 </DataTemplate>

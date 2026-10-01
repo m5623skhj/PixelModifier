@@ -32,9 +32,15 @@ public sealed class CandidateView : INotifyPropertyChanged
     public required BitmapSource[] Frames { get; init; }
     public required InputSnapshot[] Inputs { get; init; }
     public required MotionQuality Quality { get; init; }
+    public required PixelQuality PixelQuality { get; init; }
+    public float RankingScore => .65f * PixelQuality.Score + .35f * Quality.Score;
     public string Title => $"{(Settings.Motion == MotionKind.Walk ? "걷기" : "달리기")}  {Variant.Index + 1:00}";
     public string Details => $"보폭 {Variant.Stride * 100:0.#} · 발 높이 {Variant.Lift * 100:0.#}";
-    public string QualityLabel => $"동작 안정성 {Quality.Score:0}/100";
+    public string QualityLabel => $"도트 {PixelQuality.Score:0} · 동작 {Quality.Score:0}";
+    public string QualityDetails => $"도트/동작 점수는 각각 100점 기준의 참고값입니다.\n" +
+        $"추가 조각 {PixelQuality.FragmentRatio:P1}, 분리 부위 {PixelQuality.ExtraComponents:0.#}\n" +
+        $"추가 구멍 {PixelQuality.HoleRatio:P1}, 면적 변화 {PixelQuality.AreaLoss:P1}\n" +
+        $"실루엣 급변 {PixelQuality.AbruptSilhouette:P1}, 잘림 {PixelQuality.ClippingRatio:P1}";
     private BitmapSource? preview;
     private bool isSelected;
     public BitmapSource? Preview { get => preview; set { preview = value; Notify(); } }
@@ -71,6 +77,7 @@ public partial class MainWindow : Window
         timer.Start();
         FrameCountBox.TextChanged += GenerationInputChanged;
         SeedBox.TextChanged += GenerationInputChanged;
+        WorkingSizeBox.TextChanged += GenerationInputChanged;
         FacingBox.SelectionChanged += GenerationInputChanged;
         IntensitySlider.ValueChanged += GenerationInputChanged;
         CandidateCountBox.TextChanged += (_, _) => MarkDirty();
@@ -230,6 +237,7 @@ public partial class MainWindow : Window
             FrameCount = ParseInt(FrameCountBox, "프레임 수"), CandidateCount = ParseInt(CandidateCountBox, "후보 수"),
             Seed = ParseInt(SeedBox, "난수 기준값"), Intensity = (float)IntensitySlider.Value,
             FramesPerSecond = ParseFloat(FpsBox, "재생 속도"), CellWidth = cell, CellHeight = cell,
+            WorkingSize = ParseInt(WorkingSizeBox, "작업 해상도"),
             Columns = ParseInt(ColumnsBox, "열 수")
         };
     }
@@ -256,6 +264,7 @@ public partial class MainWindow : Window
             ClearCandidates(); SetBusy(true);
             int size = Math.Clamp((int)Math.Sqrt(48 * 1024 * 1024d /
                 (settings.FrameCount * settings.CandidateCount * 4d)), 32, 256);
+            if (size >= settings.WorkingSize) size = size / settings.WorkingSize * settings.WorkingSize;
             Progress.Maximum = settings.CandidateCount; Progress.Value = 0;
             var token = cancellation!.Token;
             var progress = new Progress<int>(count =>
@@ -265,7 +274,7 @@ public partial class MainWindow : Window
             });
             var results = await Task.Run(() =>
             {
-                var sources = RenderSources(inputs, size);
+                var sources = RenderSources(inputs, settings.WorkingSize);
                 var list = new List<CandidateView>();
                 for (int i = 0; i < settings.CandidateCount; i++)
                 {
@@ -273,18 +282,24 @@ public partial class MainWindow : Window
                     var variant = MotionVariant.Create(i, settings);
                     var cycle = MotionCycle.Create(sources, variant, settings, token);
                     var frames = new BitmapSource[settings.FrameCount];
+                    var logicalFrames = new PixelImage[settings.FrameCount];
                     for (int f = 0; f < frames.Length; f++)
-                        frames[f] = Imaging.Bitmap(Renderer.Render(sources, cycle, f, variant, size, size, token));
+                    {
+                        logicalFrames[f] = Renderer.Render(sources, cycle, f, variant,
+                            settings.WorkingSize, settings.WorkingSize, token);
+                        frames[f] = Imaging.Bitmap(logicalFrames[f].FitCell(size, size));
+                    }
+                    var pixelQuality = PixelQualityEvaluator.Evaluate(logicalFrames, sources, cycle, token);
                     list.Add(new() { Variant = variant, Settings = settings.Clone(), Frames = frames,
-                        Inputs = inputs, Preview = frames[0], Quality = cycle.Quality });
+                        Inputs = inputs, Preview = frames[0], Quality = cycle.Quality, PixelQuality = pixelQuality });
                     ((IProgress<int>)progress).Report(i + 1);
                 }
-                return list.OrderByDescending(c => c.Quality.Score).ThenBy(c => c.Variant.Index).ToList();
+                return list.OrderByDescending(c => c.RankingScore).ThenBy(c => c.Variant.Index).ToList();
             }, token);
             foreach (var candidate in results) Candidates.Add(candidate);
-            CandidateSummary.Text = $"{Candidates.Count}개 · 안정성순";
+            CandidateSummary.Text = $"{Candidates.Count}개 · 품질순";
             SelectCandidate(Candidates[0]);
-            Status.Text = "동작 안정성이 높은 순서로 표시했습니다. 후보를 선택해 실제 움직임을 비교하세요.";
+            Status.Text = "도트 상태와 동작 안정성을 함께 평가했습니다. 후보를 선택해 실제 움직임을 비교하세요.";
         }
         catch (OperationCanceledException) { Status.Text = "후보 생성을 취소했습니다."; }
         catch (Exception error) { ShowError(error); }
@@ -374,7 +389,7 @@ public partial class MainWindow : Window
             SetBusy(true); Progress.Maximum = settings.FrameCount; Progress.Value = 0;
             var token = cancellation!.Token;
             var progress = new Progress<int>(count => { Progress.Value = count; Status.Text = $"PNG 출력 중 {count}/{settings.FrameCount}"; });
-            await Task.Run(() => ExportService.Export(RenderSources(candidate.Inputs, Math.Min(settings.CellWidth, settings.CellHeight)),
+            await Task.Run(() => ExportService.Export(RenderSources(candidate.Inputs, settings.WorkingSize),
                 settings, candidate.Variant, dialog.FileName, token, count => ((IProgress<int>)progress).Report(count)), token);
             Status.Text = $"저장 완료: {dialog.FileName} · PNG와 JSON";
         }
@@ -436,6 +451,7 @@ public partial class MainWindow : Window
             FrameCountBox.Text = s.FrameCount.ToString(); CandidateCountBox.Text = s.CandidateCount.ToString();
             SeedBox.Text = s.Seed.ToString(); IntensitySlider.Value = s.Intensity;
             FpsBox.Text = s.FramesPerSecond.ToString(CultureInfo.CurrentCulture);
+            WorkingSizeBox.Text = s.WorkingSize.ToString();
             CellSizeBox.Text = s.CellWidth.ToString(); ColumnsBox.Text = s.Columns.ToString();
             SourcesList.SelectedIndex = Sources.Count > 0 ? 0 : -1;
         }
